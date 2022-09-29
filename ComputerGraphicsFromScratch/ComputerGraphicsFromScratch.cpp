@@ -6,14 +6,12 @@
 #include "3rdparty/renderdoc_app.h"
 #include <raylib.h>
 #include <raymath.h>
-#include <queue>
 #include "raylib_renderdoc.h"
 
 #define CAMERA_ORIGIN_DISTANCE 1.0f
 #define VIEWPORT_WIDTH 1.0f
 #define VIEWPORT_HEIGHT 1.0f
 #define CANVAS_WIDTH 800
-//#define IFNINITY 10000000000.0f
 #define CANVAS_HEIGHT 800
 
 struct Vector2Int
@@ -21,23 +19,6 @@ struct Vector2Int
     int x;
     int y;
 };
-
-//struct PointLight
-//{
-//    Vector3 position;
-//    float intensity;
-//};
-//
-//struct DirectionalLight
-//{
-//    Vector3 direction;
-//    float intensity;
-//};
-//
-//struct AmbientLight
-//{
-//    float intensity;
-//};
 
 struct Sphere
 {
@@ -65,10 +46,7 @@ Sphere objects[] =
 void SetPixel(Image* buf, int x, int y, Color c) {
     ImageDrawPixel(buf, x, y, c);
 }
-float ComputeLighting(Vector3 point) 
-{
-    return 0.0f;
-}
+
 RayCollision1 IntersectRaySphere(Ray R, Sphere sp)
 {
     float r = sp.radius;
@@ -160,17 +138,6 @@ void DrawScene(Image* img)
     }    
 }
 
-
-struct DrawTextNotification
-{
-    char text[100] = { 0 };
-    uint32_t text_count;
-    uint32_t frame_count = 0;
-    uint32_t frame_duration = 10;
-};
-
-std::queue<DrawTextNotification> notifs;
-
 int main(void)
 {
     LoadRenderDoc();
@@ -216,21 +183,6 @@ int main(void)
         {
             ClearBackground(BLACK);
             DrawTextureRec(rtd.texture, canvas_rect, Vector2(), WHITE); //white tint
-            DrawText("Watermark", CANVAS_WIDTH - 60, CANVAS_HEIGHT - 10, 10, RED);
-
-            if (!notifs.empty())
-            {
-                DrawTextNotification& notif = notifs.front();
-                if (notif.frame_count <= notif.frame_duration)
-                {
-                    DrawText(notif.text, 10, 10, 10, RED);
-                    notif.frame_count++;
-                }
-                else 
-                {
-                    notifs.pop();
-                }
-            }
         }
         EndDrawing();
 
