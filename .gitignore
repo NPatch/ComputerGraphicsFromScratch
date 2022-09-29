@@ -30,3 +30,14 @@
 *.exe
 *.out
 *.app
+
+#Debug stuff
+*.pdb
+
+#Visual Studio stuff
+.vs
+Debug
+x64
+
+#vcpkg stuff
+vcpkg_installed
