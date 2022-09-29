@@ -1,10 +1,9 @@
-#include "3rdparty/renderdoc_app.h"
 #ifndef WIN32_LEAN_AND_MEAN
 #	define WIN32_LEAN_AND_MEAN
 #endif // WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <assert.h>
-#include <stdio.h>
+#include "3rdparty/renderdoc_app.h"
 #include "raylib_renderdoc.h"
 
 pRENDERDOC_GetAPI RENDERDOC_GetAPI;
@@ -19,12 +18,6 @@ void* LoadRenderDoc()
 	}
 
 	void* renderdoc_dll = (void*)LoadLibraryA("renderdoc.dll");
-
-	if (NULL == renderdoc_dll)
-	{
-		printf("GetModuleHandle failed (%d)\n", GetLastError());
-	}
-
 
 	if(NULL != renderdoc_dll)
 	{
