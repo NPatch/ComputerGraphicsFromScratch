@@ -176,7 +176,7 @@ int main(void)
         {//Draw directly onto a texture
             ImageClearBackground(&img, BLACK);
             DrawScene(&img);           
-            UpdateTexture(tex, img.data);             // Update texture with new image data
+            UpdateTexture(tex, img.data);             // Update GPU with new CPU data.
         }
         
         //Blitting the texture on screen using a rect
