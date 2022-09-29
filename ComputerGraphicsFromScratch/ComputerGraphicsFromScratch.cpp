@@ -189,14 +189,10 @@ int main(void)
     camera.fovy = 53.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
-    bool capture = false;
-
     while (!WindowShouldClose())
     {
-        if (IsKeyDown(KEY_F11))
+        if (RenderDocIsFrameCapturing())
         {
-            capture = true;
-            notifs.push(DrawTextNotification{ "Captured Frame", 14, 0, 5 });
             RenderDocBeginFrameCapture();
         }
 
@@ -238,10 +234,9 @@ int main(void)
         }
         EndDrawing();
 
-        if (capture)
+        if (RenderDocIsFrameCapturing())
         {
             RenderDocEndFrameCapture();
-            capture = false;
         }
     }
 

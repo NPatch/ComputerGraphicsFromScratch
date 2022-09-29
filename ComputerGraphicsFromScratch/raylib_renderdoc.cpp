@@ -53,6 +53,12 @@ void UnloadRenderDoc()
 	}
 }
 
+bool RenderDocIsFrameCapturing()
+{
+	if (NULL != rdoc_api) return rdoc_api->IsFrameCapturing();
+	return false;
+}
+
 void RenderDocBeginFrameCapture() 
 {
 	// To start a frame capture, call StartFrameCapture.
@@ -71,14 +77,5 @@ void RenderDocEndFrameCapture()
 	if (NULL != rdoc_api)
 	{
 		rdoc_api->EndFrameCapture(NULL, NULL);
-	}
-}
-
-
-void RenderDocTriggerFrameCapture()
-{
-	if (NULL != rdoc_api)
-	{
-		rdoc_api->TriggerCapture();
 	}
 }
