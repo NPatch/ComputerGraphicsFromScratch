@@ -173,25 +173,17 @@ int main(void)
             RenderDocBeginFrameCapture();
         }
 
-        BeginMode3D(camera);
-        {
-            ClearBackground(BLACK);
-
+        {//Draw directly onto a texture
             ImageClearBackground(&img, BLACK);
-            
-            {//Draw here
-                DrawScene(&img);
-            }
-            
+            DrawScene(&img);           
             UpdateTexture(tex, img.data);             // Update texture with new image data
         }
-        EndMode3D();
         
-        //Blitting the render texture on screen.
+        //Blitting the texture on screen using a rect
         BeginDrawing ();
         {
             ClearBackground(BLACK);
-            DrawTextureRec(tex, canvas_rect, Vector2(), WHITE); //white tint
+            DrawTextureRec(tex, canvas_rect, Vector2Zero(), WHITE); //white tint
         }
         EndDrawing();
 
@@ -201,8 +193,8 @@ int main(void)
         }
     }
 
-    UnloadImage(img);         // Unload texture
-    UnloadTexture(tex);
+    UnloadImage(img);         // Unload CPU texture copy
+    UnloadTexture(tex);       // Unload GPU texture
 
     CloseWindow();
 
