@@ -14,7 +14,6 @@ In this case, to emulate painting pixels, we create a raylib Image which is a CP
 in GPU land, which we then blit to the screen.
 */
 
-#include "3rdparty/renderdoc_app.h"
 #include "raylib_renderdoc.h"
 #include <raylib.h>
 #include <raymath.h>
