@@ -1,12 +1,23 @@
 /**
-3D Coordinate Space is Left Handed (Yup, X right, Z fwd)
+Chapter 2: Basic Raytracing
 
+Using a simple fixed camera setup, we add spheres in front of the camera and perform raytracing on each "pixel" of the Canvas.
+Using each ray, we check against each sphere to see if there's an intersection. Intersections are checked against the common
+solution of the sphere equation and the ray line equation. The results are values that give us the point based on the ray equation (O + tD).
+If the discriminant is negative, we have no intersection. If the discriminant is positive and t1==t2, we have one intersection 
+point (the ray is basically tangent to the sphere on the intersection point). When t1 != t2, then we have two intersection points, 
+one is the entry and the other the exit point of the ray on the sphere. We compare all solutions to find the minimum, since that
+will also be the closest intersection point to the ray origin (in this case where the camera is positioned). The sphere with the
+closest intersection point, dictates the color we use to paint the "pixel". If no intersection exists, we use Black.
+
+In this case, to emulate painting pixels, we create a raylib Image which is a CPU buffer and then use it to paint, then upload it to a Texture2D
+in GPU land, which we then blit to the screen.
 */
 
 #include "3rdparty/renderdoc_app.h"
+#include "raylib_renderdoc.h"
 #include <raylib.h>
 #include <raymath.h>
-#include "raylib_renderdoc.h"
 
 #define CAMERA_ORIGIN_DISTANCE 1.0f
 #define VIEWPORT_WIDTH 1.0f
@@ -27,7 +38,7 @@ struct Sphere
     Color color;
 };
 
-struct RayCollision1
+struct RayIntersection
 {
     float t1;
     float t2;
@@ -47,7 +58,7 @@ void SetPixel(Image* buf, int x, int y, Color c) {
     ImageDrawPixel(buf, x, y, c);
 }
 
-RayCollision1 IntersectRaySphere(Ray R, Sphere sp)
+RayIntersection IntersectRaySphere(Ray R, Sphere sp)
 {
     float r = sp.radius;
     Vector3 CO = Vector3Subtract(CAMERA_ORIGIN, sp.center);
@@ -60,10 +71,10 @@ RayCollision1 IntersectRaySphere(Ray R, Sphere sp)
     float discriminant = (b * b) - (4.0f * a * c);
     if (discriminant < 0.0f)
     {
-        return RayCollision1{ INFINITY, INFINITY };
+        return RayIntersection{ INFINITY, INFINITY };
     }
 
-    RayCollision1 collision;
+    RayIntersection collision;
     collision.t1 = (-b + sqrtf(discriminant)) / (2.0f * a);
     collision.t2 = (-b - sqrtf(discriminant)) / (2.0f * a);
     return collision;
@@ -90,7 +101,7 @@ Color TraceRay(Image* img, Ray r, float tmin, float tmax)
     for (int i = 0; i < 3; i++)
     {
         Sphere& sph = objects[i];
-        RayCollision1 collision = IntersectRaySphere(r, sph);
+        RayIntersection collision = IntersectRaySphere(r, sph);
 
         if (collision.t1 != INFINITY
             && collision.t2 != INFINITY)
@@ -143,9 +154,8 @@ int main(void)
     LoadRenderDoc();
     InitWindow(CANVAS_WIDTH, CANVAS_HEIGHT, "Computer Graphics from Scratch");
 
-    RenderTexture2D rtd = LoadRenderTexture(CANVAS_WIDTH, CANVAS_HEIGHT); 
+    Rectangle canvas_rect = { 0.0f, 0.0f, CANVAS_WIDTH, CANVAS_HEIGHT };
     Image img = GenImageColor(CANVAS_WIDTH, CANVAS_HEIGHT, BLACK); //CPU land
-    Rectangle canvas_rect = { 0.0f, 0.0f, CANVAS_WIDTH, -CANVAS_HEIGHT };
     Texture2D tex = LoadTextureFromImage(img); //GPU land
 
     // Define the camera to look into our 3d world
@@ -163,7 +173,7 @@ int main(void)
             RenderDocBeginFrameCapture();
         }
 
-        BeginTextureMode(rtd);
+        BeginMode3D(camera);
         {
             ClearBackground(BLACK);
 
@@ -174,15 +184,14 @@ int main(void)
             }
             
             UpdateTexture(tex, img.data);             // Update texture with new image data
-            DrawTexture(tex, 0, 0, WHITE);            // Draw the updated texture in the render texture (basically upload to gpu)
         }
-        EndTextureMode();
+        EndMode3D();
         
         //Blitting the render texture on screen.
         BeginDrawing ();
         {
             ClearBackground(BLACK);
-            DrawTextureRec(rtd.texture, canvas_rect, Vector2(), WHITE); //white tint
+            DrawTextureRec(tex, canvas_rect, Vector2(), WHITE); //white tint
         }
         EndDrawing();
 
@@ -194,7 +203,6 @@ int main(void)
 
     UnloadImage(img);         // Unload texture
     UnloadTexture(tex);
-    UnloadRenderTexture(rtd); // Unload render texture
 
     CloseWindow();
 
