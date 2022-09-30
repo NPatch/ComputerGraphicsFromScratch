@@ -24,6 +24,8 @@ in GPU land, which we then blit to the screen.
 #define CANVAS_WIDTH 800
 #define CANVAS_HEIGHT 800
 
+#define COUNT_OF(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
+
 struct Vector2Int
 {
     int x;
@@ -43,15 +45,56 @@ struct RayIntersection
     float t2;
 };
 
+enum LightType 
+{
+    POINT,
+    DIRECTIONAL,
+    AMBIENT
+};
+
+struct Light
+{
+    Vector3 position;
+    Vector3 direction;
+    float intensity;
+    LightType type;
+};
+
 const Vector3 CAMERA_ORIGIN = { 0 };
 const Vector3 CAMERA_LOOK_DIRECTION = { 0, 0, 1 };
 
 Sphere objects[] = 
 {
-        Sphere{ Vector3{ 0.0f, -1.0f, 3.0f }, 0.1f , RED},
-        Sphere{ Vector3{ 2.0f, 0.0f, 4.0f }, 0.1f , BLUE },
-        Sphere{ Vector3{ -2.0f, 0.0f, 4.0f }, 0.1f , GREEN }
+        Sphere{ Vector3{ 0.0f, -1.0f, 3.0f }, 1.0f , RED},
+        Sphere{ Vector3{ 2.0f, 0.0f, 4.0f }, 1.0f , BLUE },
+        Sphere{ Vector3{ -2.0f, 0.0f, 4.0f }, 1.0f , GREEN },
+        Sphere{ Vector3{ 0.0f, -5001.0f, 0.0f }, 5000.0f , YELLOW }
 };
+
+
+Light lights[] =
+{
+        Light{ Vector3{2.0f, 1.0f, 0.0f }, Vector3{  0.0f, -1.0f, 3.0f },  0.6f , LightType::POINT},
+        Light{ Vector3{0.0f, 0.0f, 0.0f }, Vector3{  1.0f,  4.0f, 4.0f },  0.2f , LightType::DIRECTIONAL },
+        Light{ Vector3{0.0f, 0.0f, 0.0f }, Vector3{  0.0f,  0.0f, 0.0f },  0.2f , LightType::AMBIENT}
+};
+
+Vector4 Vector4Scale(Vector4 v, float scalar)
+{
+    Vector4 result = { v.x * scalar, v.y * scalar, v.z * scalar , v.w /** scalar*/};
+    return result;
+}
+
+Color ColorMultiply(Color col, float factor) 
+{
+    Color c = {
+        (unsigned char)(Clamp((float)col.r * factor,0.0f, 255.0f)),
+        (unsigned char)(Clamp((float)col.g * factor,0.0f, 255.0f)),
+        (unsigned char)(Clamp((float)col.b * factor,0.0f, 255.0f)),
+        255
+    };
+    return c;
+}
 
 void SetPixel(Image* buf, int x, int y, Color c) {
     ImageDrawPixel(buf, x, y, c);
@@ -61,7 +104,6 @@ RayIntersection IntersectRaySphere(Ray R, Sphere sp)
 {
     float r = sp.radius;
     Vector3 CO = Vector3Subtract(CAMERA_ORIGIN, sp.center);
-    CO = Vector3Normalize(CO);
 
     float a = Vector3DotProduct(R.direction, R.direction);
     float b = 2.0f * Vector3DotProduct(CO, R.direction);
@@ -93,11 +135,45 @@ Vector3 CanvasToViewport(Vector2Int canvas_point)
     return Vector3{ vx, vy, CAMERA_ORIGIN_DISTANCE };
 }
 
+float ComputeLighting(Vector3 point, Vector3 sphere_center) 
+{
+    Vector3 normal = Vector3Subtract(point, sphere_center);
+
+    float light_contrib = 0.0f;
+    for (int i=0;i< COUNT_OF(lights);i++)
+    {
+        Light& l = lights[i];
+
+        Vector3 beam_dir = Vector3Zero();
+
+        if (l.type == LightType::AMBIENT) 
+        {
+            light_contrib += l.intensity;
+        }
+        else {
+            if (l.type == LightType::POINT)
+            {
+                beam_dir = Vector3Subtract(l.position, point);
+            }
+            else if (l.type == LightType::DIRECTIONAL)
+            {
+                beam_dir = l.direction;
+            }
+
+            float n_to_l = Vector3DotProduct(normal, beam_dir);
+            float coefficient = n_to_l / (Vector3Length(normal) * Vector3Length(beam_dir));
+            light_contrib += l.intensity * coefficient;
+        }
+    }
+    
+    return light_contrib;
+}
+
 Color TraceRay(Image* img, Ray r, float tmin, float tmax)
 {
     float closest_t = INFINITY;
     Sphere* closest_sphere = NULL;
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < COUNT_OF(objects); i++)
     {
         Sphere& sph = objects[i];
         RayIntersection collision = IntersectRaySphere(r, sph);
@@ -124,9 +200,13 @@ Color TraceRay(Image* img, Ray r, float tmin, float tmax)
 
     if (closest_sphere == NULL)
     {
-        return BLACK;
+        return WHITE;
     }
-    return closest_sphere->color;
+
+    Vector3 intersection_point = Vector3Add(r.position, Vector3Scale(r.direction, closest_t));
+    float light_contrib = ComputeLighting(intersection_point, closest_sphere->center);
+
+    return ColorMultiply(closest_sphere->color, light_contrib);
 }
 
 void DrawScene(Image* img)
@@ -138,7 +218,6 @@ void DrawScene(Image* img)
             Vector2Int canvas_pos = { x,y };
             Vector3 viewport_pos = CanvasToViewport(canvas_pos);
             Vector3 ray_direction = Vector3Subtract(viewport_pos, CAMERA_ORIGIN);
-            ray_direction = Vector3Normalize(ray_direction);
             Ray r = { CAMERA_ORIGIN, ray_direction };
 
             Color col = TraceRay(img, r, 1.0f, INFINITY);
@@ -154,7 +233,7 @@ int main(void)
     InitWindow(CANVAS_WIDTH, CANVAS_HEIGHT, "Computer Graphics from Scratch");
 
     Rectangle canvas_rect = { 0.0f, 0.0f, CANVAS_WIDTH, CANVAS_HEIGHT };
-    Image img = GenImageColor(CANVAS_WIDTH, CANVAS_HEIGHT, BLACK); //CPU land
+    Image img = GenImageColor(CANVAS_WIDTH, CANVAS_HEIGHT, WHITE); //CPU land
     Texture2D tex = LoadTextureFromImage(img); //GPU land
 
     // Define the camera to look into our 3d world
@@ -173,7 +252,6 @@ int main(void)
         }
 
         {//Draw directly onto a texture
-            ImageClearBackground(&img, BLACK);
             DrawScene(&img);           
             UpdateTexture(tex, img.data);             // Update GPU with new CPU data.
         }
@@ -181,8 +259,8 @@ int main(void)
         //Blitting the texture on screen using a rect
         BeginDrawing ();
         {
-            ClearBackground(BLACK);
             DrawTextureRec(tex, canvas_rect, Vector2Zero(), WHITE); //white tint
+            DrawFPS(10, 10);
         }
         EndDrawing();
 
