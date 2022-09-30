@@ -48,9 +48,9 @@ const Vector3 CAMERA_LOOK_DIRECTION = { 0, 0, 1 };
 
 Sphere objects[] = 
 {
-        Sphere{ Vector3{ 0.0f, -1.0f, 3.0f }, 0.1f , RED},
-        Sphere{ Vector3{ 2.0f, 0.0f, 4.0f }, 0.1f , BLUE },
-        Sphere{ Vector3{ -2.0f, 0.0f, 4.0f }, 0.1f , GREEN }
+        Sphere{ Vector3{ 0.0f, -1.0f, 3.0f }, 1.0f , RED},
+        Sphere{ Vector3{ 2.0f, 0.0f, 4.0f }, 1.0f , BLUE },
+        Sphere{ Vector3{ -2.0f, 0.0f, 4.0f }, 1.0f , GREEN }
 };
 
 void SetPixel(Image* buf, int x, int y, Color c) {
@@ -61,7 +61,6 @@ RayIntersection IntersectRaySphere(Ray R, Sphere sp)
 {
     float r = sp.radius;
     Vector3 CO = Vector3Subtract(CAMERA_ORIGIN, sp.center);
-    CO = Vector3Normalize(CO);
 
     float a = Vector3DotProduct(R.direction, R.direction);
     float b = 2.0f * Vector3DotProduct(CO, R.direction);
@@ -124,7 +123,7 @@ Color TraceRay(Image* img, Ray r, float tmin, float tmax)
 
     if (closest_sphere == NULL)
     {
-        return BLACK;
+        return WHITE;
     }
     return closest_sphere->color;
 }
@@ -138,7 +137,6 @@ void DrawScene(Image* img)
             Vector2Int canvas_pos = { x,y };
             Vector3 viewport_pos = CanvasToViewport(canvas_pos);
             Vector3 ray_direction = Vector3Subtract(viewport_pos, CAMERA_ORIGIN);
-            ray_direction = Vector3Normalize(ray_direction);
             Ray r = { CAMERA_ORIGIN, ray_direction };
 
             Color col = TraceRay(img, r, 1.0f, INFINITY);
@@ -154,7 +152,7 @@ int main(void)
     InitWindow(CANVAS_WIDTH, CANVAS_HEIGHT, "Computer Graphics from Scratch");
 
     Rectangle canvas_rect = { 0.0f, 0.0f, CANVAS_WIDTH, CANVAS_HEIGHT };
-    Image img = GenImageColor(CANVAS_WIDTH, CANVAS_HEIGHT, BLACK); //CPU land
+    Image img = GenImageColor(CANVAS_WIDTH, CANVAS_HEIGHT, WHITE); //CPU land
     Texture2D tex = LoadTextureFromImage(img); //GPU land
 
     // Define the camera to look into our 3d world
@@ -173,7 +171,7 @@ int main(void)
         }
 
         {//Draw directly onto a texture
-            ImageClearBackground(&img, BLACK);
+            ImageClearBackground(&img, WHITE);
             DrawScene(&img);           
             UpdateTexture(tex, img.data);             // Update GPU with new CPU data.
         }
@@ -181,7 +179,7 @@ int main(void)
         //Blitting the texture on screen using a rect
         BeginDrawing ();
         {
-            ClearBackground(BLACK);
+            //ClearBackground(WHITE); //We can skip bc we draw a full screen texture.
             DrawTextureRec(tex, canvas_rect, Vector2Zero(), WHITE); //white tint
         }
         EndDrawing();
