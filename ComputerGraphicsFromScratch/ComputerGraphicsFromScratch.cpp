@@ -37,6 +37,7 @@ struct Sphere
     Vector3 center;
     float radius;
     Color color;
+    float specular_exponent;
 };
 
 struct RayIntersection
@@ -65,16 +66,16 @@ const Vector3 CAMERA_LOOK_DIRECTION = { 0, 0, 1 };
 
 Sphere objects[] = 
 {
-        Sphere{ Vector3{ 0.0f, -1.0f, 3.0f }, 1.0f , RED},
-        Sphere{ Vector3{ 2.0f, 0.0f, 4.0f }, 1.0f , BLUE },
-        Sphere{ Vector3{ -2.0f, 0.0f, 4.0f }, 1.0f , GREEN },
-        Sphere{ Vector3{ 0.0f, -5001.0f, 0.0f }, 5000.0f , YELLOW }
+        Sphere{ Vector3{ 0.0f, -1.0f, 3.0f }, 1.0f , Color{ 255, 0, 0, 255 }, 500.0f},
+        Sphere{ Vector3{ -2.0f, 0.0f, 4.0f }, 1.0f , Color{ 0, 255, 0, 255 }, 10.0f},
+        Sphere{ Vector3{ 2.0f, 0.0f, 4.0f }, 1.0f , Color{ 0, 0, 255, 255 }, 500.0f},
+        Sphere{ Vector3{ 0.0f, -5001.0f, 0.0f }, 5000.0f , Color{ 255, 255, 0, 255 }, 1000.0f}
 };
 
 
 Light lights[] =
 {
-        Light{ Vector3{2.0f, 1.0f, 0.0f }, Vector3{  0.0f, -1.0f, 3.0f },  0.6f , LightType::POINT},
+        Light{ Vector3{2.0f, 1.0f, 0.0f }, Vector3{  0.0f, 0.0f, 0.0f },  0.6f , LightType::POINT},
         Light{ Vector3{0.0f, 0.0f, 0.0f }, Vector3{  1.0f,  4.0f, 4.0f },  0.2f , LightType::DIRECTIONAL },
         Light{ Vector3{0.0f, 0.0f, 0.0f }, Vector3{  0.0f,  0.0f, 0.0f },  0.2f , LightType::AMBIENT}
 };
@@ -88,9 +89,9 @@ Vector4 Vector4Scale(Vector4 v, float scalar)
 Color ColorMultiply(Color col, float factor) 
 {
     Color c = {
-        (unsigned char)(Clamp((float)col.r * factor,0.0f, 255.0f)),
-        (unsigned char)(Clamp((float)col.g * factor,0.0f, 255.0f)),
-        (unsigned char)(Clamp((float)col.b * factor,0.0f, 255.0f)),
+        (unsigned char)Clamp((float)col.r * factor,0.0f, 255.0f),
+        (unsigned char)Clamp((float)col.g * factor,0.0f, 255.0f),
+        (unsigned char)Clamp((float)col.b * factor,0.0f, 255.0f),
         255
     };
     return c;
@@ -135,34 +136,48 @@ Vector3 CanvasToViewport(Vector2Int canvas_point)
     return Vector3{ vx, vy, CAMERA_ORIGIN_DISTANCE };
 }
 
-float ComputeLighting(Vector3 point, Vector3 sphere_center) 
+float ComputeLighting(Vector3 point, Vector3 normal, Vector3 viewer_dir, float specular_exponent)
 {
-    Vector3 normal = Vector3Subtract(point, sphere_center);
-
     float light_contrib = 0.0f;
     for (int i=0;i< COUNT_OF(lights);i++)
     {
-        Light& l = lights[i];
+        Light& light = lights[i];
 
-        Vector3 beam_dir = Vector3Zero();
+        Vector3 light_direction = Vector3Zero();
 
-        if (l.type == LightType::AMBIENT) 
+        if (light.type == LightType::AMBIENT) 
         {
-            light_contrib += l.intensity;
+            light_contrib += light.intensity;
         }
         else {
-            if (l.type == LightType::POINT)
+            if (light.type == LightType::POINT)
             {
-                beam_dir = Vector3Subtract(l.position, point);
+                light_direction = Vector3Subtract(light.position, point);
             }
-            else if (l.type == LightType::DIRECTIONAL)
+            else if (light.type == LightType::DIRECTIONAL)
             {
-                beam_dir = l.direction;
+                light_direction = light.direction;
             }
 
-            float n_to_l = Vector3DotProduct(normal, beam_dir);
-            float coefficient = n_to_l / (Vector3Length(normal) * Vector3Length(beam_dir));
-            light_contrib += l.intensity * coefficient;
+            float n_to_l = Vector3DotProduct(normal, light_direction);
+            if (n_to_l > 0.0f)
+            {
+                float coefficient = n_to_l / (Vector3Length(normal) * Vector3Length(light_direction));
+                light_contrib += light.intensity * coefficient;
+            }
+
+            if (specular_exponent != -1.0f)
+            {
+                Vector3 refl_vert = Vector3Scale(normal, 2.0f * n_to_l);
+                Vector3 refl_dir = Vector3Subtract(refl_vert, light_direction);
+                float refl_to_view = Vector3DotProduct(refl_dir, viewer_dir);
+                if (refl_to_view > 0.0f)
+                {
+                    float refl_contrib = refl_to_view / (Vector3Length(refl_dir) * Vector3Length(viewer_dir));
+                    refl_contrib = powf(refl_contrib, specular_exponent);
+                    light_contrib += (light.intensity * refl_contrib);
+                }
+            }
         }
     }
     
@@ -178,23 +193,19 @@ Color TraceRay(Image* img, Ray r, float tmin, float tmax)
         Sphere& sph = objects[i];
         RayIntersection collision = IntersectRaySphere(r, sph);
 
-        if (collision.t1 != INFINITY
-            && collision.t2 != INFINITY)
+        if (collision.t1 > tmin
+            && collision.t1 < tmax
+            && collision.t1 < closest_t)
         {
-            if (collision.t1 >= tmin
-                && collision.t1 <= tmax
-                && collision.t1 < closest_t)
-            {
-                closest_t = collision.t1;
-                closest_sphere = &sph;
-            }
-            if (collision.t2 >= tmin
-                && collision.t2 <= tmax
-                && collision.t2 < closest_t)
-            {
-                closest_t = collision.t2;
-                closest_sphere = &sph;
-            }
+            closest_t = collision.t1;
+            closest_sphere = &sph;
+        }
+        if (collision.t2 > tmin
+            && collision.t2 < tmax
+            && collision.t2 < closest_t)
+        {
+            closest_t = collision.t2;
+            closest_sphere = &sph;
         }
     }
 
@@ -203,8 +214,12 @@ Color TraceRay(Image* img, Ray r, float tmin, float tmax)
         return WHITE;
     }
 
-    Vector3 intersection_point = Vector3Add(r.position, Vector3Scale(r.direction, closest_t));
-    float light_contrib = ComputeLighting(intersection_point, closest_sphere->center);
+    Vector3 point = Vector3Add(r.position, Vector3Scale(r.direction, closest_t));
+    Vector3 normal = Vector3Subtract(point, closest_sphere->center);
+    normal = Vector3Normalize(normal);
+
+    Vector3 view_dir = Vector3Scale(r.direction, -1.0f);
+    float light_contrib = ComputeLighting(point, normal, view_dir, closest_sphere->specular_exponent);
 
     return ColorMultiply(closest_sphere->color, light_contrib);
 }
@@ -216,8 +231,7 @@ void DrawScene(Image* img)
         for (int y = -CANVAS_HEIGHT / 2; y < CANVAS_HEIGHT / 2; y++)
         {
             Vector2Int canvas_pos = { x,y };
-            Vector3 viewport_pos = CanvasToViewport(canvas_pos);
-            Vector3 ray_direction = Vector3Subtract(viewport_pos, CAMERA_ORIGIN);
+            Vector3 ray_direction = CanvasToViewport(canvas_pos);
             Ray r = { CAMERA_ORIGIN, ray_direction };
 
             Color col = TraceRay(img, r, 1.0f, INFINITY);
